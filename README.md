@@ -22,8 +22,8 @@
 
 ## Проверить за 2 минуты
 
-1. `cp .env.example .env`, вписать `BOT_TOKEN`, свой id в `ADMIN_IDS` (id покажет @userinfobot) и https-адрес туннеля в `WEBAPP_URL` (см. «Запуск»).
-2. `docker compose up --build`.
+1. `cp .env.example .env`, вписать `BOT_TOKEN` и свой id в `ADMIN_IDS` (id покажет @userinfobot).
+2. `./scripts/run.sh`: поднимает https-туннель, Postgres и бота, печатает ссылку на бота. `--clean` очищает пользователей перед стартом, Ctrl+C всё останавливает.
 3. Открыть бота по ссылке `https://t.me/<бот>?start=reg_tgc_oldmero_1_2810_ut`, нажать «Старт» и «Поделиться контактом».
 4. Дашборд: кнопка меню «Дашборд» в чате с ботом. Без Telegram: `DASHBOARD_DEV=1` в `.env` и http://localhost:8000.
 
@@ -31,7 +31,7 @@
 
 Нужны Docker и токен бота из @BotFather.
 
-Telegram открывает Mini App только по https, поэтому нужен туннель на `localhost:8000`. Подойдёт любой, например без регистрации:
+Telegram открывает Mini App только по https, поэтому нужен туннель на `localhost:8000`. `./scripts/run.sh` делает всё ниже сам; вручную подойдёт любой туннель, например без регистрации:
 
 ```bash
 ssh -R 80:localhost:8000 nokey@localhost.run   # выдаст https://xxxx.lhr.life
