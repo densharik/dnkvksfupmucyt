@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Воронка регистраций</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    --text: var(--tg-theme-text-color, #16181d);
+    --hint: var(--tg-theme-hint-color, #7d8590);
+    --accent: var(--tg-theme-button-color, #2f80ed);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --danger: var(--tg-theme-destructive-text-color, #d64545);
+    --ok: #2e9e5b;
+    --line: color-mix(in srgb, var(--hint) 22%, transparent);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.tg) {
+      --bg: #17191d; --bg2: #212429; --text: #e8eaed; --hint: #8b929b; --accent: #5b9cf5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg2); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 12px 12px 32px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 4px 12px; }
+  h1 { font-size: 18px; margin: 0; }
+  .live { color: var(--hint); font-size: 12px; }
+  .live::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok); margin-right: 6px; vertical-align: 1px; }
+  .live.off::before { background: var(--danger); }
+  section { background: var(--bg); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--hint);
+    margin: 0 0 10px; font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kpi b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .kpi span { color: var(--hint); font-size: 12px; }
+  @media (max-width: 420px) { .kpis { grid-template-columns: repeat(2, 1fr); row-gap: 12px; } }
+
+  .step { margin-bottom: 10px; }
+  .step-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .step-head .n { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .bar { position: relative; height: 22px; background: var(--bg2); border-radius: 6px; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 6px;
+    transition: width .4s ease; }
+  .drop { font-size: 12px; color: var(--hint); margin-top: 3px; }
+  .drop .loss { color: var(--danger); }
+  .small { color: var(--hint); font-size: 11px; border: 1px solid var(--line); border-radius: 4px;
+    padding: 0 4px; margin-left: 4px; white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+  th { color: var(--hint); font-weight: 500; font-size: 12px; }
+  td.r, th.r { text-align: right; }
+  tr:last-child td { border-bottom: 0; }
+  .muted { color: var(--hint); }
+  .note { color: var(--hint); font-size: 12px; margin: 8px 0 0; }
+  .sub { color: var(--hint); font-size: 11px; word-break: break-all; }
+  .nowrap { white-space: nowrap; }
+
+  .days { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
+  .day { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .day .col { width: 100%; position: relative; border-radius: 3px 3px 0 0; background: var(--bg2); }
+  .day .col i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 3px 3px 0 0; }
+  .day small { font-size: 9px; color: var(--hint); margin-top: 3px; }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--hint); margin-top: 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  .queue { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--bg2); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+  .chip b { font-variant-numeric: tabular-nums; }
+  .chip.bad b { color: var(--danger); }
+  .err { margin-top: 30vh; text-align: center; color: var(--hint); padding: 0 24px; }
+</style>
+</head>
+<body>
+<main id="app"><p class="err">Загрузка...</p></main>
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+if (tg && tg.initData) { document.documentElement.classList.add("tg"); tg.ready(); tg.expand(); }
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const pct = (x) => (x * 100).toFixed(x > 0 && x < 0.1 ? 1 : 0) + "%";
+const conv = (r) => r.n
+  ? pct(r.p) + (r.small ? '<sup class="muted">*</sup>' : "")
+  : '<span class="muted">-</span>';
+
+function funnel(rows) {
+  const top = rows[0].n || 1;
+  return rows.map((s, i) => {
+    const f = s.from_prev;
+    const lost = i ? f.n - f.k : 0;
+    return `<div class="step">
+      <div class="step-head"><span>${esc(s.label)}</span><span class="n">${s.n}</span></div>
+      <div class="bar"><i style="width:${s.n / top * 100}%"></i></div>
+      ${i ? `<div class="drop">${pct(f.p)} от шага выше${lost ? `, <span class="loss">потеряно ${lost}</span>` : ""}${f.small ? '<span class="small">мало данных</span>' : ""}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function table(head, rows) {
+  return `<table><tr>${head.map(([t, r]) => `<th${r ? ' class="r"' : ""}>${t}</th>`).join("")}</tr>${
+    rows.join("") || `<tr><td class="muted" colspan="${head.length}">пока пусто</td></tr>`}</table>`;
+}
+
+function daily(days) {
+  const max = Math.max(1, ...days.map((d) => d.starts));
+  return `<div class="days">${days.map((d) => `
+    <div class="day" title="${d.day}: старт ${d.starts}, телефон ${d.phones}">
+      <div class="col" style="height:${d.starts / max * 100}%"><i style="height:${d.starts ? d.phones / d.starts * 100 : 0}%"></i></div>
+      <small>${d.day.slice(0, 2)}</small>
+    </div>`).join("")}</div>
+    <div class="legend"><span><i style="background:var(--bg2);border:1px solid var(--line)"></i>старт</span>
+    <span><i style="background:var(--accent)"></i>оставили телефон</span></div>`;
+}
+
+function ago(iso) {
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return "только что";
+  if (s < 3600) return Math.floor(s / 60) + " мин";
+  if (s < 86400) return Math.floor(s / 3600) + " ч";
+  return new Date(iso).toLocaleDateString("ru-RU");
+}
+
+function render(d) {
+  const t = d.totals, q = d.queue;
+  const median = t.median_phone_sec == null ? "-" : t.median_phone_sec < 90
+    ? Math.round(t.median_phone_sec) + " с" : Math.round(t.median_phone_sec / 60) + " мин";
+  $("#app").innerHTML = `
+  <header><h1>${esc(d.launch)}</h1><span class="live" id="live">обновлено ${new Date().toLocaleTimeString("ru-RU")}</span></header>
+
+  <section class="kpis">
+    <div class="kpi"><b>${t.starts}</b><span>нажали /start</span></div>
+    <div class="kpi"><b>${t.phones}</b><span>оставили телефон</span></div>
+    <div class="kpi"><b>${t.starts ? pct(t.phones / t.starts) : "-"}</b><span>старт → телефон</span></div>
+    <div class="kpi"><b>${median}</b><span>медиана до телефона</span></div>
+  </section>
+
+  <section><h2>Воронка</h2>${funnel(d.funnel)}</section>
+
+  <section><h2>Источники (метка в /start)</h2>${table(
+    [["Канал"], ["Аудитория"], ["Старт", 1], ["Телефон", 1], ["Конверсия", 1]],
+    d.sources.map((s) => `<tr><td>${esc(s.channel)}</td><td class="muted">${esc(s.audience) || "-"}</td>
+      <td class="r">${s.starts}</td><td class="r">${s.phones}</td><td class="r">${conv(s.conv)}</td></tr>`))}
+    <p class="note">* меньше 30 человек, процент ненадёжен.</p></section>
+
+  <section><h2>Время поста</h2>${table(
+    [["Слот"], ["Старт", 1], ["Телефон", 1], ["Конверсия", 1]],
+    d.slots.map((s) => `<tr><td>${esc(s.slot)}</td><td class="r">${s.starts}</td><td class="r">${s.phones}</td><td class="r">${conv(s.conv)}</td></tr>`))}</section>
+
+  <section><h2>Посты</h2>${table(
+    [["Метка"], ["Слот"], ["Старт", 1], ["Телефон", 1], ["Конв.", 1]],
+    d.posts.map((p) => `<tr><td>${esc(p.post)}<div class="sub">${esc(p.source)}</div></td><td class="muted">${esc(p.slot)}</td><td class="r">${p.starts}</td><td class="r">${p.phones}</td><td class="r">${conv(p.conv)}</td></tr>`))}</section>
+
+  <section><h2>Регистрации за 14 дней</h2>${daily(d.daily)}</section>
+
+  <section><h2>Рефералы: ${t.ref_total} друзей с телефоном</h2>${table(
+    [["Пригласил"], ["Друзей", 1]],
+    d.referrers.map((r) => `<tr><td>${esc(r.name)} <span class="muted">${r.username ? "@" + esc(r.username) : ""}</span></td><td class="r">${r.friends}</td></tr>`))}</section>
+
+  <section><h2>Последние регистрации</h2>${table(
+    [["Кто и откуда"], ["Телефон"], ["Когда", 1]],
+    d.recent.map((u) => `<tr><td>${esc(u.name)}${u.blocked ? ' <span class="small">заблокировал</span>' : ""}<div class="sub">${esc(u.source)}</div></td>
+      <td class="muted nowrap">${esc(u.phone) || "-"}</td><td class="r muted nowrap">${ago(u.at)}</td></tr>`))}</section>
+
+  <section><h2>Очередь сообщений</h2><div class="queue">
+    <span class="chip">ждут <b>${q.pending || 0}</b></span>
+    <span class="chip">отправлено <b>${q.sent || 0}</b></span>
+    <span class="chip">пропущено <b>${q.skipped || 0}</b></span>
+    <span class="chip ${q.failed ? "bad" : ""}">ошибки <b>${q.failed || 0}</b></span>
+    <span class="chip ${t.blocked ? "bad" : ""}">заблокировали бота <b>${t.blocked}</b></span>
+  </div>${d.errors.length ? table([["Сообщение"], ["Ошибка"], ["Когда", 1]],
+    d.errors.map((e) => `<tr><td>${esc(e.key)}</td><td class="muted">${esc(e.error)}</td><td class="r muted">${ago(e.at)}</td></tr>`)) : ""}</section>`;
+}
+
+async function load() {
+  try {
+    const res = await fetch("/api/stats", { headers: tg && tg.initData ? { Authorization: "tma " + tg.initData } : {} });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.status);
+    render(await res.json());
+  } catch (e) {
+    const live = $("#live");
+    if (live) { live.classList.add("off"); live.textContent = "нет связи"; }
+    else $("#app").innerHTML = `<p class="err">${esc(e.message)}</p>`;
+  }
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>
