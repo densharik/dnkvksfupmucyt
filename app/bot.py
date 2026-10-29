@@ -25,14 +25,14 @@ router = Router()
 
 @router.message(CommandStart())
 async def on_start(message: Message, command: CommandObject, pool: asyncpg.Pool, cfg: LaunchConfig,
-                   bot: Bot, settings: Settings, box: dict, bot_username: str):
+                   bot: Bot, settings: Settings, bot_username: str):
     u = message.from_user
     src = parse_start(command.args)
     user, is_new = await db.register_start(pool, u.id, u.first_name, u.username, src)
     log.info("start user=%s new=%s src=%s", u.id, is_new, src.raw or "organic")
 
     if u.id in settings.admins:
-        await set_admin_menu(bot, u.id, box.get("webapp_url"))
+        await set_admin_menu(bot, u.id, settings.webapp_url)
 
     if user["phone"]:
         tickets = await db.tickets_count(pool, u.id)
@@ -84,12 +84,12 @@ async def credit_referrer(bot: Bot, pool: asyncpg.Pool, cfg: LaunchConfig, ref_b
 
 
 @router.message(Command("dashboard"))
-async def on_dashboard(message: Message, settings: Settings, box: dict, bot: Bot):
+async def on_dashboard(message: Message, settings: Settings, bot: Bot):
     if message.from_user.id not in settings.admins:
         return
-    url = box.get("webapp_url")
+    url = settings.webapp_url
     if not url:
-        await message.answer("Адрес миниаппа ещё не готов: туннель не поднят. Смотри логи.")
+        await message.answer("Не задан WEBAPP_URL: впишите https-адрес туннеля в .env и перезапустите бота.")
         return
     await set_admin_menu(bot, message.from_user.id, url)
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Открыть дашборд", web_app=WebAppInfo(url=url))]])

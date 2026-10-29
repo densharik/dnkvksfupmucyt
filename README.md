@@ -22,7 +22,7 @@
 
 ## Проверить за 2 минуты
 
-1. `cp .env.example .env`, вписать `BOT_TOKEN` и свой id в `ADMIN_IDS` (id покажет @userinfobot).
+1. `cp .env.example .env`, вписать `BOT_TOKEN`, свой id в `ADMIN_IDS` (id покажет @userinfobot) и https-адрес туннеля в `WEBAPP_URL` (см. «Запуск»).
 2. `docker compose up --build`.
 3. Открыть бота по ссылке `https://t.me/<бот>?start=reg_tgc_oldmero_1_2810_ut`, нажать «Старт» и «Поделиться контактом».
 4. Дашборд: кнопка меню «Дашборд» в чате с ботом. Без Telegram: `DASHBOARD_DEV=1` в `.env` и http://localhost:8000.
@@ -31,14 +31,18 @@
 
 Нужны Docker и токен бота из @BotFather.
 
+Telegram открывает Mini App только по https, поэтому нужен туннель на `localhost:8000`. Подойдёт любой, например без регистрации:
+
 ```bash
-cp .env.example .env        # вписать BOT_TOKEN и свой ADMIN_IDS
-docker compose up --build   # Postgres + бот + API + https-туннель
+ssh -R 80:localhost:8000 nokey@localhost.run   # выдаст https://xxxx.lhr.life
 ```
 
-В логах появится строка `dashboard: https://xxxx.trycloudflare.com/`. У админа в чате с ботом появится кнопка меню «Дашборд», и есть команда `/dashboard`.
+```bash
+cp .env.example .env        # BOT_TOKEN, свой ADMIN_IDS, WEBAPP_URL=адрес туннеля
+docker compose up --build   # Postgres + бот + API
+```
 
-Если туннель Cloudflare не поднимается (в части сетей РФ соединение с ним рвётся), подойдёт любой другой https-туннель: `ssh -R 80:localhost:8000 nokey@localhost.run`, полученный адрес вписать в `WEBAPP_URL` и перезапустить бота.
+У админа в чате с ботом появится кнопка меню «Дашборд», и есть команда `/dashboard`.
 
 Демо-данные, чтобы дашборд не был пустым (400 регистраций за 14 дней с метками):
 
@@ -46,7 +50,7 @@ docker compose up --build   # Postgres + бот + API + https-туннель
 docker compose exec bot uv run python -m scripts.seed
 ```
 
-Без Docker для бота: `docker compose up -d db tunnel`, затем `uv run python -m app`. Если в `.env` стоит `DASHBOARD_DEV=1`, дашборд открывается в обычном браузере на http://localhost:8000.
+Без Docker для бота: `docker compose up -d db`, затем `uv run python -m app`. Если в `.env` стоит `DASHBOARD_DEV=1`, дашборд открывается в обычном браузере на http://localhost:8000.
 
 Тесты: `uv run pytest`. Тесты очереди работают на живом Postgres из compose; без базы они пропускаются.
 
@@ -76,7 +80,7 @@ docker compose exec bot uv run python -m scripts.seed
 
 ```
 app/
-  __main__.py  один процесс: polling бота + воркер очереди + API + поиск адреса туннеля
+  __main__.py  один процесс: polling бота + воркер очереди + API
   bot.py       хендлеры: /start, контакт, блокировка бота, /dashboard
   worker.py    отправка отложенных сообщений из таблицы jobs
   db.py        схема и запросы (asyncpg, без ORM)

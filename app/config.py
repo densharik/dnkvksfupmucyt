@@ -13,9 +13,8 @@ class Settings(BaseSettings):
     # Telegram id через запятую: кому доступен дашборд.
     admin_ids: str = ""
     launch_config: Path = Path("config/launch.yaml")
-    # Публичный https-адрес миниаппа. Пусто - адрес берётся у cloudflared.
+    # Публичный https-адрес миниаппа (Telegram открывает Mini App только по https).
     webapp_url: str = ""
-    cloudflared_metrics: str = "http://localhost:2000"
     api_port: int = 8000
     # Открыть дашборд в обычном браузере без Telegram. Только для локальной разработки.
     dashboard_dev: bool = False

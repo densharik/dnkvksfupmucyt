@@ -12,19 +12,11 @@ services:
       interval: 2s
       retries: 15
 
-  # Mini App требует https. Quick tunnel даёт временный адрес *.trycloudflare.com без аккаунта.
-  tunnel:
-    image: cloudflare/cloudflared:2025.8.1
-    # http2 вместо QUIC: UDP часто режут VPN и корпоративные сети.
-    command: tunnel --no-autoupdate --protocol http2 --metrics 0.0.0.0:2000 --url http://bot:8000
-    restart: unless-stopped
-
   bot:
     build: .
     env_file: .env
     environment:
       DATABASE_URL: postgresql://funnel:funnel@db:5432/funnel
-      CLOUDFLARED_METRICS: http://tunnel:2000
     ports: ["8000:8000"]
     volumes: [./config:/app/config:ro]
     depends_on:
