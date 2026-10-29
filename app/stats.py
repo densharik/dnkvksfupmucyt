@@ -23,17 +23,18 @@ async def collect(pool: asyncpg.Pool, cfg: LaunchConfig) -> dict:
         FROM users
         """
     )
-    sent = {r["key"]: r["n"] for r in await pool.fetch(
-        "SELECT key, count(*) AS n FROM jobs WHERE status = 'sent' GROUP BY key"
+    jobs = {(r["key"], r["status"]): r["n"] for r in await pool.fetch(
+        "SELECT key, status, count(*) AS n FROM jobs GROUP BY 1, 2"
     )}
 
-    steps = [("Старт", totals["starts"]), ("Телефон", totals["phones"])]
+    steps = [("Старт", totals["starts"], 0), ("Телефон", totals["phones"], 0)]
     for i, m in enumerate(cfg.messages, 1):
-        steps.append((f"Сообщение {i} (+{m.delay_seconds}с)", sent.get(m.key, 0)))
+        steps.append((f"Сообщение {i} (+{m.delay_seconds}с)", jobs.get((m.key, "sent"), 0),
+                      jobs.get((m.key, "pending"), 0) + jobs.get((m.key, "processing"), 0)))
     funnel = []
-    for i, (label, n) in enumerate(steps):
+    for i, (label, n, waiting) in enumerate(steps):
         prev = steps[i - 1][1] if i else n
-        funnel.append({"label": label, "n": n, "from_prev": rate(n, prev)})
+        funnel.append({"label": label, "n": n, "waiting": waiting, "from_prev": rate(n, prev)})
 
     sources = [
         {"channel": r["src_channel"], "audience": r["src_audience"], "starts": r["starts"],

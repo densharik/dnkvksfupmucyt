@@ -96,11 +96,11 @@ function funnel(rows) {
   const top = rows[0].n || 1;
   return rows.map((s, i) => {
     const f = s.from_prev;
-    const lost = i ? f.n - f.k : 0;
+    const lost = i ? Math.max(0, f.n - f.k - s.waiting) : 0;
     return `<div class="step">
       <div class="step-head"><span>${esc(s.label)}</span><span class="n">${s.n}</span></div>
       <div class="bar"><i style="width:${s.n / top * 100}%"></i></div>
-      ${i ? `<div class="drop">${pct(f.p)} от шага выше${lost ? `, <span class="loss">потеряно ${lost}</span>` : ""}${f.small ? '<span class="small">мало данных</span>' : ""}</div>` : ""}
+      ${i ? `<div class="drop">${pct(f.p)} от шага выше${s.waiting ? `, ждут ${s.waiting}` : ""}${lost ? `, <span class="loss">потеряно ${lost}</span>` : ""}${f.small ? '<span class="small">мало данных</span>' : ""}</div>` : ""}
     </div>`;
   }).join("");
 }

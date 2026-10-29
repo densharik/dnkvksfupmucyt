@@ -27,7 +27,7 @@ set_url "$URL"
 
 docker compose up -d --wait db
 if [ "${1:-}" = "--clean" ]; then
-    docker compose exec -T db psql -qU funnel -c "TRUNCATE jobs, users" 2>/dev/null || true
+    docker compose exec -T db psql -qU funnel -c "TRUNCATE jobs, users; ALTER SEQUENCE ticket_seq RESTART" 2>/dev/null || true
 fi
 docker compose up -d --build bot
 
